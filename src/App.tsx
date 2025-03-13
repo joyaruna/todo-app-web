@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Trash2, CheckCircle, PlusCircle } from "lucide-react";
 import "./App.css";
@@ -21,43 +21,79 @@ export default function TodoApp() {
   const [editingTask, setEditingTask] = useState<{ listId: number; taskIndex: number } | null>(null);
   const [editText, setEditText] = useState<string>("");
 
+  // Load lists from localStorage on first render
+  useEffect(() => {
+    const savedLists = localStorage.getItem("todoLists");
+    if (savedLists) {
+      try {
+        setLists(JSON.parse(savedLists));
+      } catch (error) {
+        console.error("Error loading lists from localStorage:", error);
+      }
+    }
+  }, []);
+
+  // Save lists to localStorage whenever they change
+  useEffect(() => {
+    if (lists.length > 0) {
+      localStorage.setItem("todoLists", JSON.stringify(lists));
+    }
+  }, [lists]);
+
   const addList = (): void => {
     if (listName.trim()) {
-      setLists([...lists, { id: Date.now(), name: listName, tasks: [], newTaskText: "" }]);
+      setLists((prevLists) => {
+        const newLists = [...prevLists, { id: Date.now(), name: listName, tasks: [], newTaskText: "" }];
+        localStorage.setItem("todoLists", JSON.stringify(newLists)); // Save immediately
+        return newLists;
+      });
       setListName("");
     }
   };
 
   const addTask = (listId: number): void => {
-    setLists(lists.map(list =>
-      list.id === listId && list.newTaskText.trim()
-        ? { ...list, tasks: [...list.tasks, { text: list.newTaskText, completed: false }], newTaskText: "" }
-        : list
-    ));
+    setLists((prevLists) => {
+      const newLists = prevLists.map(list =>
+        list.id === listId && list.newTaskText.trim()
+          ? { ...list, tasks: [...list.tasks, { text: list.newTaskText.trim(), completed: false }], newTaskText: "" }
+          : list
+      );
+      localStorage.setItem("todoLists", JSON.stringify(newLists)); // Save immediately
+      return newLists;
+    });
   };
 
   const toggleTask = (listId: number, taskIndex: number): void => {
-    setLists(prevLists =>
-      prevLists.map(list =>
+    setLists((prevLists) => {
+      const newLists = prevLists.map(list =>
         list.id === listId
           ? { ...list, tasks: list.tasks.map((task, index) => index === taskIndex ? { ...task, completed: !task.completed } : task) }
           : list
-      )
-    );
+      );
+      localStorage.setItem("todoLists", JSON.stringify(newLists)); // Save immediately
+      return newLists;
+    });
   };
 
   const removeTask = (listId: number, taskIndex: number): void => {
-    setLists(prevLists =>
-      prevLists.map(list =>
-        list.id === listId
+    setLists((prevLists) => {
+      const newLists = prevLists
+        .map(list => list.id === listId
           ? { ...list, tasks: list.tasks.filter((_, index) => index !== taskIndex) }
           : list
-      ).filter(list => list.tasks.length > 0)
-    );
+        )
+        .filter(list => list.tasks.length > 0 || list.newTaskText.trim() !== "");
+      localStorage.setItem("todoLists", JSON.stringify(newLists)); // Save immediately
+      return newLists;
+    });
   };
 
   const deleteList = (listId: number): void => {
-    setLists(lists.filter(list => list.id !== listId));
+    setLists((prevLists) => {
+      const newLists = prevLists.filter(list => list.id !== listId);
+      localStorage.setItem("todoLists", JSON.stringify(newLists)); // Save immediately
+      return newLists;
+    });
   };
 
   const startEditing = (listId: number, taskIndex: number, currentText: string): void => {
@@ -67,16 +103,20 @@ export default function TodoApp() {
 
   const saveEdit = (): void => {
     if (editingTask) {
-      setLists(lists.map(list =>
-        list.id === editingTask.listId
-          ? {
-            ...list,
-            tasks: list.tasks.map((task, index) =>
-              index === editingTask.taskIndex ? { ...task, text: editText.trim() || task.text } : task
-            ),
-          }
-          : list
-      ));
+      setLists((prevLists) => {
+        const newLists = prevLists.map(list =>
+          list.id === editingTask.listId
+            ? {
+                ...list,
+                tasks: list.tasks.map((task, index) =>
+                  index === editingTask.taskIndex ? { ...task, text: editText.trim() || task.text } : task
+                ),
+              }
+            : list
+        );
+        localStorage.setItem("todoLists", JSON.stringify(newLists)); // Save immediately
+        return newLists;
+      });
       setEditingTask(null);
       setEditText("");
     }
